@@ -103,7 +103,9 @@
   .mcell.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
   .mcell .dnum{font-size:12px;font-family:'Jua';color:var(--ink-soft);}
   .mcell.today .dnum{color:var(--accent);}
-  .mcell .ev{font-size:10.5px;padding:2px 6px;border-radius:5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;}
+  .mcell .ev{font-size:10.5px;padding:2px 6px;border-radius:5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;cursor:grab;}
+  .mcell .ev:active{cursor:grabbing;}
+  .mcell.drop-hover{outline:2px dashed var(--accent);outline-offset:-2px;background:var(--accent-soft);}
   .mcell .more{font-size:9.5px;color:var(--ink-faint);padding-left:4px;}
   .day-pop{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 12px 32px rgba(40,20,80,.22);padding:12px 14px;min-width:180px;max-width:240px;pointer-events:none;animation:popfade .12s ease;}
   @keyframes popfade{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
@@ -177,6 +179,11 @@
   .detail-evt .foot{display:flex;gap:5px;margin-top:7px;padding-left:2px;flex-wrap:wrap;align-items:center;}
   .detail-evt .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:12px;opacity:.6;}
   .detail-evt .del:hover{opacity:1;color:#ff5b6e;}
+  .evt-actions{display:flex;gap:2px;}
+  .evt-actions .ea{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:11px;opacity:.55;padding:3px 5px;border-radius:6px;}
+  .evt-actions .ea:hover{opacity:1;background:var(--bg);color:var(--accent);}
+  .evt-actions .ea.del:hover{color:#ff5b6e;}
+  .dl-badge{background:#ff5b6e;color:#fff;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:'Jua';}
   .chip{font-size:9.5px;padding:2px 8px;border-radius:20px;color:#fff;}
   .bell{font-size:10.5px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:3px;}
   .add-evt-btn{width:100%;border:1.5px dashed var(--line-2);background:none;border-radius:12px;padding:10px;color:var(--ink-faint);font-size:12px;cursor:pointer;font-family:'Gowun Dodum';margin-top:2px;display:flex;align-items:center;justify-content:center;gap:6px;}
@@ -277,6 +284,12 @@
   .m-type .d{width:7px;height:7px;border-radius:99px;}
   .modal input[type=text]{width:100%;padding:10px 13px;border-radius:11px;border:1.5px solid var(--line-2);background:var(--surface-2);font-size:14px;color:var(--ink);font-family:'Gowun Dodum';margin-bottom:12px;}
   .modal input[type=text]:focus{outline:2px solid var(--accent-soft);}
+  .m-deadline{display:flex;align-items:center;gap:9px;margin:6px 0 16px;cursor:pointer;user-select:none;}
+  .m-deadline .md-check{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--line-2);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;flex:0 0 auto;transition:.12s;}
+  .m-deadline.on .md-check{background:#ff5b6e;border-color:#ff5b6e;color:#fff;}
+  .m-deadline .md-text{font-size:12.5px;color:var(--ink-soft);}
+  .m-deadline .md-text i{color:#ff5b6e;margin-right:2px;}
+  .m-deadline.on .md-text{color:var(--ink);font-weight:600;}
   .m-time-row{display:flex;align-items:center;gap:9px;margin-bottom:18px;flex-wrap:wrap;}
   .m-lead{margin-bottom:18px;}
   .m-lead-opts{display:flex;flex-wrap:wrap;gap:5px;}
@@ -405,6 +418,10 @@
     <div class="m-label">종류</div>
     <div class="m-types" id="modalTypes"></div>
     <input type="text" id="modalTitle" placeholder="일정 제목">
+    <label class="m-deadline" id="modalDeadlineRow">
+      <span class="md-check" id="modalDeadlineCheck"><i class="fa-solid fa-check"></i></span>
+      <span class="md-text"><i class="fa-solid fa-triangle-exclamation"></i> 마감으로 표시</span>
+    </label>
     <div class="m-time-row">
       <input type="time" id="modalTime">
       <button class="m-alarm disabled" id="modalAlarm"><i class="fa-solid fa-bell-slash"></i> 알림</button>
@@ -485,6 +502,20 @@ function renderTypeFilters(){
 }
 
 /* ============ 렌더: 월간 달력 ============ */
+let draggingEvId=null, draggingFrom=null;
+function moveEventTo(toKey){
+  if(!draggingEvId||!draggingFrom||toKey===draggingFrom) return;
+  const fromList=events[draggingFrom]||[];
+  const idx=fromList.findIndex(e=>e.id===draggingEvId);
+  if(idx<0) return;
+  const [ev]=fromList.splice(idx,1);
+  if(!fromList.length) delete events[draggingFrom];
+  if(!events[toKey]) events[toKey]=[];
+  events[toKey].push(ev);
+  selectedDate=toKey;
+  draggingEvId=null; draggingFrom=null;
+  renderAll();
+}
 function renderMonth(){
   const mgrid = document.getElementById('mgrid');
   hideDayPop();
@@ -506,7 +537,7 @@ function renderMonth(){
     if(activeTypeFilter) list = list.filter(e=>e.typeId===activeTypeFilter);
     let evHtml = list.slice(0,2).map(e=>{
       const t=findType(e.typeId);
-      return `<span class="ev" style="background:${t.color}">${e.title}</span>`;
+      return `<span class="ev" draggable="true" data-evid="${e.id}" data-from="${key}" style="background:${t.color}">${e.isDeadline?'⚠ ':''}${e.title}</span>`;
     }).join('');
     if(list.length>2) evHtml+=`<span class="more">+${list.length-2}</span>`;
     const cls = 'mcell'+(key===TK?' today':'')+(key===selectedDate?' sel':'');
@@ -514,14 +545,31 @@ function renderMonth(){
   }).join('');
 
   mgrid.querySelectorAll('.mcell:not(.other)').forEach(el=>{
-    el.onclick=()=>{ selectedDate = el.dataset.key; renderMonth(); renderSelectedDay(); };
+    el.onclick=(e)=>{ if(el._dragging)return; selectedDate = el.dataset.key; renderMonth(); renderSelectedDay(); };
     const key=el.dataset.key;
     let list=(events[key]||[]);
     if(activeTypeFilter) list=list.filter(e=>e.typeId===activeTypeFilter);
     if(list.length>0){
-      el.onmouseenter=()=>showDayPop(el,key,list);
+      el.onmouseenter=()=>{ if(!draggingEvId) showDayPop(el,key,list); };
       el.onmouseleave=hideDayPop;
     }
+    // 드롭 타겟
+    el.ondragover=(e)=>{ e.preventDefault(); el.classList.add('drop-hover'); };
+    el.ondragleave=()=>el.classList.remove('drop-hover');
+    el.ondrop=(e)=>{
+      e.preventDefault(); el.classList.remove('drop-hover');
+      moveEventTo(el.dataset.key);
+    };
+  });
+
+  // 일정 드래그 시작/끝
+  mgrid.querySelectorAll('.ev[draggable]').forEach(sp=>{
+    sp.ondragstart=(e)=>{
+      draggingEvId=+sp.dataset.evid; draggingFrom=sp.dataset.from;
+      hideDayPop();
+      e.dataTransfer.effectAllowed='move';
+    };
+    sp.ondragend=()=>{ draggingEvId=null; draggingFrom=null; };
   });
 }
 
@@ -583,20 +631,32 @@ function renderSelectedDay(){
   if(list.length===0){
     sub.innerHTML=''; box.innerHTML=`<div style="font-size:12px;color:var(--ink-faint);text-align:center;padding:10px 0;">일정이 없어요</div>`;
   }else{
-    const hasDeadline = list.some(e=>e.typeId==='deadline');
+    const hasDeadline = list.some(e=>e.isDeadline);
     sub.innerHTML = `일정 ${list.length}개${hasDeadline?' · <i class="fa-solid fa-triangle-exclamation" style="color:#ff5b6e"></i> 마감 있음':''}`;
     box.innerHTML = list.map(e=>{
       const t=findType(e.typeId);
       return `<div class="detail-evt"><div class="bar" style="background:${t.color}"></div>
         <div class="dhead"><div class="h"><i class="fa-solid fa-clock"></i> ${e.time||'종일'}</div>
-        <button class="del" data-id="${e.id}"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="tt">${e.title}</div>
-        <div class="foot"><span class="chip" style="background:${t.color}">${t.name}</span>${e.alarm?`<span class="bell"><i class="fa-solid fa-bell" style="color:${t.color}"></i></span>`:''}</div></div>`;
+        <div class="evt-actions">
+          <button class="ea" data-edit="${e.id}" title="수정"><i class="fa-solid fa-pen"></i></button>
+          <button class="ea" data-dup="${e.id}" title="복제"><i class="fa-solid fa-copy"></i></button>
+          <button class="ea del" data-id="${e.id}" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+        </div></div>
+        <div class="tt">${e.isDeadline?'<i class="fa-solid fa-triangle-exclamation" style="color:#ff5b6e;font-size:11px;margin-right:4px;"></i>':''}${e.title}</div>
+        <div class="foot"><span class="chip" style="background:${t.color}">${t.name}</span>${e.isDeadline?'<span class="dl-badge">마감</span>':''}${e.alarm?`<span class="bell"><i class="fa-solid fa-bell" style="color:${t.color}"></i></span>`:''}</div></div>`;
     }).join('');
     box.querySelectorAll('.del').forEach(b=>b.onclick=()=>{
       events[selectedDate]=events[selectedDate].filter(x=>x.id!=b.dataset.id);
       if(!events[selectedDate].length) delete events[selectedDate];
       renderAll();
+    });
+    box.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{
+      const ev=(events[selectedDate]||[]).find(x=>x.id==b.dataset.edit);
+      if(ev) openModal(selectedDate, ev);
+    });
+    box.querySelectorAll('[data-dup]').forEach(b=>b.onclick=()=>{
+      const ev=(events[selectedDate]||[]).find(x=>x.id==b.dataset.dup);
+      if(ev){ events[selectedDate].push({...ev,id:++uid,title:ev.title+' (복사)'}); renderAll(); }
     });
   }
 }
@@ -732,17 +792,34 @@ function renderTypeManage(){
 
 /* ============ 일정 추가 모달 ============ */
 const LEAD_OPTIONS=[{v:0,label:'정각'},{v:1,label:'1분 전'},{v:5,label:'5분 전'},{v:15,label:'15분 전'},{v:30,label:'30분 전'},{v:60,label:'1시간 전'}];
-let modalTypeId=null, modalAlarmOn=false, modalLead=0;
-function openModal(dateKey){
+let modalTypeId=null, modalAlarmOn=false, modalLead=0, modalDeadline=false, modalEditId=null;
+function openModal(dateKey, editEvent){
   document.getElementById('modalBg').classList.add('show');
   const d=new Date(dateKey);
   document.getElementById('modalDate').textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${WD[d.getDay()]})`;
   document.getElementById('modalBg').dataset.date=dateKey;
-  modalTypeId=types[0].id; modalAlarmOn=false; modalLead=0;
-  document.getElementById('modalTitle').value='';
-  document.getElementById('modalTime').value='';
-  renderModalTypes(); renderModalLead(); updateModalAlarm();
+  if(editEvent){
+    // 수정 모드
+    modalEditId=editEvent.id;
+    modalTypeId=editEvent.typeId; modalAlarmOn=!!editEvent.alarm; modalLead=editEvent.lead||0; modalDeadline=!!editEvent.isDeadline;
+    document.getElementById('modalTitle').value=editEvent.title||'';
+    document.getElementById('modalTime').value=editEvent.time||'';
+    document.querySelector('#modalBg h3').childNodes[0].nodeValue='일정 수정 ';
+    document.getElementById('modalSubmit').textContent='저장하기';
+  }else{
+    // 추가 모드
+    modalEditId=null;
+    modalTypeId=types[0].id; modalAlarmOn=false; modalLead=0; modalDeadline=false;
+    document.getElementById('modalTitle').value='';
+    document.getElementById('modalTime').value='';
+    document.querySelector('#modalBg h3').childNodes[0].nodeValue='일정 추가 ';
+    document.getElementById('modalSubmit').textContent='추가하기';
+  }
+  renderModalTypes(); renderModalLead(); updateModalAlarm(); updateModalDeadline();
   setTimeout(()=>document.getElementById('modalTitle').focus(),50);
+}
+function updateModalDeadline(){
+  document.getElementById('modalDeadlineRow').classList.toggle('on',modalDeadline);
 }
 function renderModalTypes(){
   document.getElementById('modalTypes').innerHTML=types.map(t=>{
@@ -778,9 +855,17 @@ function submitModal(){
   const title=document.getElementById('modalTitle').value.trim();
   const time=document.getElementById('modalTime').value;
   if(!title){document.getElementById('modalTitle').focus();return;}
-  if(!events[dateKey]) events[dateKey]=[];
   const alarm=!!time&&modalAlarmOn;
-  events[dateKey].push({id:++uid,title,time:time||null,alarm,lead:alarm?modalLead:0,typeId:modalTypeId});
+  if(modalEditId){
+    // 수정: 기존 일정 찾아서 갱신
+    const list=events[dateKey]||[];
+    const ev=list.find(e=>e.id===modalEditId);
+    if(ev){ ev.title=title; ev.time=time||null; ev.alarm=alarm; ev.lead=alarm?modalLead:0; ev.typeId=modalTypeId; ev.isDeadline=modalDeadline; }
+  }else{
+    // 추가
+    if(!events[dateKey]) events[dateKey]=[];
+    events[dateKey].push({id:++uid,title,time:time||null,alarm,lead:alarm?modalLead:0,typeId:modalTypeId,isDeadline:modalDeadline});
+  }
   document.getElementById('modalBg').classList.remove('show');
   selectedDate=dateKey; renderAll();
 }
@@ -825,6 +910,7 @@ document.getElementById('modalClose').onclick=()=>document.getElementById('modal
 document.getElementById('modalBg').onclick=(e)=>{if(e.target.id==='modalBg')e.currentTarget.classList.remove('show');};
 document.getElementById('modalTime').oninput=updateModalAlarm;
 document.getElementById('modalAlarm').onclick=()=>{if(document.getElementById('modalTime').value){modalAlarmOn=!modalAlarmOn;updateModalAlarm();}};
+document.getElementById('modalDeadlineRow').onclick=()=>{modalDeadline=!modalDeadline;updateModalDeadline();};
 document.getElementById('modalSubmit').onclick=submitModal;
 document.getElementById('modalTitle').onkeydown=(e)=>{if(e.key==='Enter')submitModal();};
 
@@ -1002,6 +1088,10 @@ function applyState(s){
   if(typeof s.soundType==='string') soundType = s.soundType;
   if(typeof s.palIndex==='number') curPal = s.palIndex;
   if(typeof s.mode==='string') curMode = s.mode;
+  // 예전 데이터 호환: isDeadline 없던 시절 '예약마감' 종류는 마감으로 간주
+  Object.values(events).forEach(list=>list.forEach(e=>{
+    if(e.isDeadline===undefined) e.isDeadline = (e.typeId==='deadline');
+  }));
 }
 
 // 저장 + 알림 재예약 (디바운스로 잦은 쓰기 방지)
