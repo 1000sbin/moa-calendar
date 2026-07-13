@@ -1,7 +1,7 @@
 {
   "name": "moa-calendar",
   "version": "1.0.0",
-  "description": "모아 캘린더 - 일정 관리 데스크톱 앱",
+  "description": "모아 캘린더 - 덕질 일정 관리 데스크톱 앱",
   "main": "main.js",
   "author": "Modi",
   "license": "MIT",
