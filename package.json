@@ -1,0 +1,53 @@
+{
+  "name": "moa-calendar",
+  "version": "1.0.0",
+  "description": "모아 캘린더 - 일정 관리 데스크톱 앱",
+  "main": "main.js",
+  "author": "Modi",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "net.ivyro.loading0now.moacalendar",
+    "productName": "모아 캘린더",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "1000sbin",
+        "repo": "moa-calendar"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "모아 캘린더"
+    }
+  }
+}
