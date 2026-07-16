@@ -32,7 +32,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "GITHUB_USERNAME",
+        "owner": "1000sbin",
         "repo": "moa-calendar"
       }
     ],
