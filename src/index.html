@@ -716,6 +716,7 @@ function renderTodos(){
       <span class="todo-del" data-del="${t.id}"><i class="fa-solid fa-xmark"></i></span>
     </div>`).join('');
   bindTodoEvents(document.getElementById('rightTodoList'));
+  if(typeof persist==='function') persist();
 }
 function bindTodoEvents(scope){
   scope.querySelectorAll('[data-id]').forEach(el=>{
@@ -742,6 +743,7 @@ function renderMemos(){
       <div class="mli-d">${m.date}</div></div>`).join('');
   document.getElementById('memoNew').onclick=()=>{
     const m={id:++uid,title:'',body:'',date:'오늘'}; memos.unshift(m); openMemoId=m.id; renderMemos();
+    if(typeof persist==='function') persist();
     document.querySelector('#memoEditorWrap input')?.focus();
   };
   list.querySelectorAll('.memo-list-item').forEach(el=>el.onclick=(e)=>{
@@ -753,6 +755,7 @@ function renderMemos(){
     memos=memos.filter(m=>m.id!=b.dataset.del);
     if(openMemoId==b.dataset.del) openMemoId=memos[0]?.id||null;
     renderMemos();
+    if(typeof persist==='function') persist();
   });
   // 에디터
   const wrap=document.getElementById('memoEditorWrap');
@@ -763,8 +766,10 @@ function renderMemos(){
     <div class="divider"></div>
     <textarea id="memoBody" placeholder="메모를 입력하세요...">${(m.body||'').replace(/</g,'&lt;')}</textarea></div>`;
   document.getElementById('memoTitle').oninput=(e)=>{m.title=e.target.value;
-    document.querySelector(`.memo-list-item[data-id="${m.id}"] .mli-t`).textContent=m.title||'제목 없음';};
-  document.getElementById('memoBody').oninput=(e)=>{m.body=e.target.value;};
+    document.querySelector(`.memo-list-item[data-id="${m.id}"] .mli-t`).textContent=m.title||'제목 없음';
+    if(typeof persist==='function') persist();};
+  document.getElementById('memoBody').oninput=(e)=>{m.body=e.target.value;
+    if(typeof persist==='function') persist();};
 }
 
 /* ============ 종류 관리(설정) ============ */
@@ -782,6 +787,7 @@ function renderTypeManage(){
   });
   box.querySelectorAll('[data-name]').forEach(inp=>inp.oninput=()=>{
     findType(inp.dataset.name).name=inp.value; renderTypeFilters();
+    if(typeof persist==='function') persist();
   });
   box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
     if(types.length<=1) return;

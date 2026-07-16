@@ -1,6 +1,6 @@
 {
   "name": "moa-calendar",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "모아 캘린더 - 덕질 일정 관리 데스크톱 앱",
   "main": "main.js",
   "author": "Modi",
