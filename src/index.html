@@ -296,6 +296,8 @@
   .m-lead-opt{font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;cursor:pointer;border:1.5px solid var(--line-2);background:var(--surface);color:var(--ink-soft);}
   .m-lead-opt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}
   .modal input[type=time]{font-size:13px;padding:8px 10px;border-radius:9px;border:1.5px solid var(--line-2);background:var(--surface-2);color:var(--ink);font-family:'Gowun Dodum';}
+  .m-date-input{width:100%;padding:9px 13px;border-radius:11px;border:1.5px solid var(--line-2);background:var(--surface-2);font-size:14px;color:var(--ink);font-family:'Gowun Dodum';margin-bottom:12px;}
+  .m-date-input:focus{outline:2px solid var(--accent-soft);}
   .m-alarm{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:7px 12px;border-radius:20px;border:none;cursor:pointer;background:var(--bg);color:var(--ink-soft);}
   .m-alarm.on{background:var(--accent-soft);color:var(--accent);}
   .m-alarm.disabled{opacity:.4;cursor:not-allowed;}
@@ -415,6 +417,8 @@
   <div class="modal">
     <h3>일정 추가 <span class="x" id="modalClose"><i class="fa-solid fa-xmark"></i></span></h3>
     <div class="m-date" id="modalDate"></div>
+    <div class="m-label">날짜</div>
+    <input type="date" id="modalDateInput" class="m-date-input">
     <div class="m-label">종류</div>
     <div class="m-types" id="modalTypes"></div>
     <input type="text" id="modalTitle" placeholder="일정 제목">
@@ -656,7 +660,14 @@ function renderSelectedDay(){
     });
     box.querySelectorAll('[data-dup]').forEach(b=>b.onclick=()=>{
       const ev=(events[selectedDate]||[]).find(x=>x.id==b.dataset.dup);
-      if(ev){ events[selectedDate].push({...ev,id:++uid,title:ev.title+' (복사)'}); renderAll(); }
+      if(ev){
+        const copy={...ev,id:++uid};
+        if(!events[selectedDate]) events[selectedDate]=[];
+        events[selectedDate].push(copy);
+        renderAll();
+        // 복제 직후 수정 창을 열어 날짜(다른 달 포함)를 바로 바꿀 수 있게
+        openModal(selectedDate, copy);
+      }
     });
   }
 }
@@ -803,6 +814,7 @@ function openModal(dateKey, editEvent){
   document.getElementById('modalBg').classList.add('show');
   const d=new Date(dateKey);
   document.getElementById('modalDate').textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${WD[d.getDay()]})`;
+  document.getElementById('modalDateInput').value=dateKey;
   document.getElementById('modalBg').dataset.date=dateKey;
   if(editEvent){
     // 수정 모드
@@ -857,23 +869,36 @@ function updateModalAlarm(){
   }else{note.style.display='none';lead.style.display='none';}
 }
 function submitModal(){
-  const dateKey=document.getElementById('modalBg').dataset.date;
+  const origKey=document.getElementById('modalBg').dataset.date;
+  const newKey=document.getElementById('modalDateInput').value || origKey; // 바뀐 날짜(다른 달도 가능)
   const title=document.getElementById('modalTitle').value.trim();
   const time=document.getElementById('modalTime').value;
   if(!title){document.getElementById('modalTitle').focus();return;}
   const alarm=!!time&&modalAlarmOn;
   if(modalEditId){
-    // 수정: 기존 일정 찾아서 갱신
-    const list=events[dateKey]||[];
-    const ev=list.find(e=>e.id===modalEditId);
-    if(ev){ ev.title=title; ev.time=time||null; ev.alarm=alarm; ev.lead=alarm?modalLead:0; ev.typeId=modalTypeId; ev.isDeadline=modalDeadline; }
+    // 수정: 원래 날짜에서 꺼내서 갱신 후, (날짜가 바뀌었으면) 새 날짜에 넣기
+    const list=events[origKey]||[];
+    const idx=list.findIndex(e=>e.id===modalEditId);
+    if(idx>=0){
+      const ev=list[idx];
+      ev.title=title; ev.time=time||null; ev.alarm=alarm; ev.lead=alarm?modalLead:0; ev.typeId=modalTypeId; ev.isDeadline=modalDeadline;
+      if(newKey!==origKey){
+        list.splice(idx,1);
+        if(!list.length) delete events[origKey];
+        if(!events[newKey]) events[newKey]=[];
+        events[newKey].push(ev);
+      }
+    }
   }else{
-    // 추가
-    if(!events[dateKey]) events[dateKey]=[];
-    events[dateKey].push({id:++uid,title,time:time||null,alarm,lead:alarm?modalLead:0,typeId:modalTypeId,isDeadline:modalDeadline});
+    // 추가 (고른 날짜에)
+    if(!events[newKey]) events[newKey]=[];
+    events[newKey].push({id:++uid,title,time:time||null,alarm,lead:alarm?modalLead:0,typeId:modalTypeId,isDeadline:modalDeadline});
   }
   document.getElementById('modalBg').classList.remove('show');
-  selectedDate=dateKey; renderAll();
+  selectedDate=newKey;
+  // 다른 달로 갔으면 그 달로 화면 이동
+  const nd=new Date(newKey); viewY=nd.getFullYear(); viewM=nd.getMonth();
+  renderAll();
 }
 
 /* ============ 전체 렌더 ============ */

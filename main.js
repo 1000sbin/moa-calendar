@@ -150,16 +150,32 @@ ipcMain.handle('test-notification', (e, soundType) => {
   return true;
 });
 
-// ── 앱 라이프사이클 ──
-app.whenReady().then(() => {
-  createWindow();
-  createTray();
-  setupAutoUpdate();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+// ── 단일 인스턴스 보장 (두 번 켜져도 창 하나만) ──
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  // 이미 실행 중이면 이 두 번째 인스턴스는 바로 종료
+  app.quit();
+} else {
+  // 두 번째로 켜려 하면, 기존 창을 복구해서 보여줌
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
   });
-});
+
+  // ── 앱 라이프사이클 ──
+  app.whenReady().then(() => {
+    createWindow();
+    createTray();
+    setupAutoUpdate();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+}
 
 // ── 자동 업데이트 ──
 function setupAutoUpdate() {
